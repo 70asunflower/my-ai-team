@@ -21,3 +21,8 @@ version: 1.0.0
 - **Description**: 如果 CEO 在业务执行中动态调整了团队成员的配置设置，或成员在持续沟通中记录了新的长期经验，使用此工具将 OpenClaw 的底层碎片化实际运行时参数提取整合回统一的 Markdown 架构代码库中，并自动提交(Push)反向备份回 GitHub，完成团队自我进化的固化。
 - **Command**: `python {SKILL_DIR}/scripts/sync_team.py --action push_to_github`
 - **Permissions**: Git 网络推送权限。
+
+### 3. `team_health_check`
+- **Description**: 运行全团队的运行状态与文件完整性扫描（Health Check）。用于列出哪些长效 Agent 的实体注册丢失、工作区损坏或者缺失核心的记忆文件（MEMORY.md）。当遇到多特工协作故障时，你可以率先运行它来进行排障（Troubleshooting）。
+- **Command**: `python {SKILL_DIR}/scripts/sync_team.py --action health_check`
+- **Permissions**: Shell 系统只读探测权限。

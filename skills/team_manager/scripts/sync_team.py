@@ -128,9 +128,55 @@ def push_to_github(repo_root):
     run_command(["git", "push"], cwd=repo_root)
     print("✅ 团队整体状态与架构演化已成功备份至 GitHub。")
 
+def health_check(repo_root):
+    """执行团队成员的注册验证与运行时部件完整度检测（Health Check）"""
+    print("🩺 [CEO 自检系统] 正在进行全量特工健康度扫描 (Health Check)...")
+    arch_agents_dir = os.path.join(repo_root, "agents")
+    if not os.path.exists(arch_agents_dir):
+        print("❌ 未在当前架构目录找到 agents 目录！")
+        return
+        
+    # 获取系统实际已注册清单
+    res = subprocess.run(["openclaw", "agents", "list"], capture_output=True, text=True)
+    registered_agents = res.stdout if res.returncode == 0 else ""
+    
+    # 获取要求应该存在的 agent
+    expected_agents = []
+    for filename in os.listdir(arch_agents_dir):
+        if filename.endswith(".md"):
+            filepath = os.path.join(arch_agents_dir, filename)
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            id_match = re.search(r'id:\s*([a-zA-Z0-9_]+)', content)
+            if id_match:
+                expected_agents.append((id_match.group(1).strip(), filename))
+                
+    print("\n" + "="*40 + "\n          🩺 团队健康状态诊断报告\n" + "="*40)
+    for agent_id, filename in expected_agents:
+        if agent_id not in registered_agents:
+            print(f"❌ {agent_id} ({filename}) - \033[31m未注册 (系统表中缺失)\033[0m")
+            continue
+            
+        workspace = os.path.join(OPENCLAW_ROOT_DIR, f"workspace-{agent_id}")
+        if not os.path.exists(workspace):
+            print(f"❌ {agent_id} ({filename}) - \033[31m工作区物理丢失\033[0m")
+            continue
+            
+        # 检查核心部件
+        missing_files = []
+        for req in ["SOUL.md", "IDENTITY.md", "MEMORY.md"]:
+            if not os.path.exists(os.path.join(workspace, req)):
+                missing_files.append(req)
+                
+        if len(missing_files) > 0:
+            print(f"⚠️ {agent_id} ({filename}) - \033[33m{', '.join(missing_files)} 核心部件缺失\033[0m")
+        else:
+            print(f"✅ {agent_id} ({filename}) - \033[32m正常运作中\033[0m")
+    print("="*40 + "\n")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Team Builder Tool for CEO")
-    parser.add_argument("--action", choices=["pull_and_sync", "push_to_github"], required=True)
+    parser.add_argument("--action", choices=["pull_and_sync", "push_to_github", "health_check"], required=True)
     parser.add_argument("--repo-path", help="指定 GitHub 架构仓库所在的绝对路径", default=None)
     args = parser.parse_args()
     
@@ -149,3 +195,5 @@ if __name__ == "__main__":
         pull_and_sync(final_repo_root)
     elif args.action == "push_to_github":
         push_to_github(final_repo_root)
+    elif args.action == "health_check":
+        health_check(final_repo_root)
