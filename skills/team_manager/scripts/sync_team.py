@@ -108,8 +108,15 @@ def pull_and_sync(repo_root):
         identity_target = os.path.join(agent_workspace_dir, "IDENTITY.md")
         with open(identity_target, 'w', encoding='utf-8') as f:
             f.write(content)
+
+        # 3. 建立并激活长效记忆中枢 (MEMORY.md)
+        # OpenClaw 架构里，具备 MEMORY 才能与用户发生深度历史交互，是“常驻员工”的重要标志
+        memory_target = os.path.join(agent_workspace_dir, "MEMORY.md")
+        if not os.path.exists(memory_target):
+            with open(memory_target, 'w', encoding='utf-8') as f:
+                f.write(f"# {agent_id} 长期记忆库 (Long-term Memory)\n\n> 💡 系统提示：这是你的专属存储区。请把核心的复盘经验、User 的特殊偏好以及长期延续的项目状态更新到此。\n\n## 核心经验与偏好\n- [示例] 暂无记录\n\n## 运作历史锚点\n\n")
             
-        print(f"✅ 成功完全激活 Agent 实例物理配置: {agent_workspace_dir}")
+        print(f"✅ 成功完全激活常驻 Agent 实例物理配置 (SOUL/IDENTITY/MEMORY): {agent_workspace_dir}")
         
     print("🎯 所有特工组织机构已成功映射至 OpenClaw 引擎池，团队重组验证完毕。")
 
