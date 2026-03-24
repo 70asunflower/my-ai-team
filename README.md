@@ -125,8 +125,8 @@ graph TD
     CEO --->|"物理/代码流"| Executor
     
     %% 审核关系与反方向冒泡
-    Strategy -.- "进度触发" -.- Reviewer
-    Executor -.- "进度触发" -.- Reviewer
+    Strategy -.->|"进度触发"| Reviewer
+    Executor -.->|"进度触发"| Reviewer
     Reviewer -.->|"返回修正指令与评分"| Strategy
     Reviewer -.->|"返回修正指令与评分"| Executor
 
