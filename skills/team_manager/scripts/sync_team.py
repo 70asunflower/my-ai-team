@@ -3,16 +3,13 @@ import sys
 import subprocess
 import shutil
 import re
+import time
+import argparse
+from datetime import datetime
 
-# 约定：GitHub 架构仓库的根目录
-# 相对路径回退: scripts/ -> team_manager/ -> skills/ -> my-ai-team/
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-ARCH_AGENTS_DIR = os.path.join(REPO_ROOT, "agents")
-GLOBAL_SOUL = os.path.join(REPO_ROOT, "SOUL.md")
-
-# 约定：OpenClaw 实际存放各个单独 Agent 工作区的底层目录 
-# 根据 OpenClaw 多智能体设计，每个 agent 生成后都有独立的 workspace-<agent_id> 文件夹存配置文件
+# OpenClaw 数据存放目录，用于存放 workspace 和 openclaw.json
 OPENCLAW_ROOT_DIR = os.environ.get("OPENCLAW_DATA_DIR", os.path.expanduser("~/.openclaw"))
+OPENCLAW_JSON_PATH = os.path.join(OPENCLAW_ROOT_DIR, "openclaw.json")
 
 def run_command(cmd, cwd=None):
     print(f">> 执行: {' '.join(cmd)}")
@@ -23,25 +20,49 @@ def run_command(cmd, cwd=None):
         print(result.stdout)
     return result
 
-def pull_and_sync():
+def backup_openclaw_config():
+    """备份 openclaw.json，防止意外写入或中断导致注册表损坏"""
+    if os.path.exists(OPENCLAW_JSON_PATH):
+        backup_dir = os.path.join(OPENCLAW_ROOT_DIR, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(backup_dir, f"openclaw_{timestamp}.json")
+        try:
+            shutil.copy(OPENCLAW_JSON_PATH, backup_path)
+            print(f"📦 已自动备份系统注册表: {backup_path}")
+            
+            # 清理旧备份（只保留最近 5 个）
+            backups = sorted([os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.startswith("openclaw_")])
+            for old_backup in backups[:-5]:
+                try: os.remove(old_backup)
+                except: pass
+        except Exception as e:
+            print(f"⚠️ 备份系统注册表失败: {e}")
+
+def pull_and_sync(repo_root):
     """从 GitHub 拉取最新架构，并拆解复制给每一个 OpenClaw Agent 单体文件池中"""
-    print("📥 [CEO 权限] 正在拉取最新的 GitHub 团队架构设计...")
+    print(f"📥 [CEO 权限] 正在拉取基于仓库 ({repo_root}) 的团队架构设计...")
     
-    if os.path.exists(os.path.join(REPO_ROOT, ".git")):
-        run_command(["git", "pull"], cwd=REPO_ROOT)
+    arch_agents_dir = os.path.join(repo_root, "agents")
+    global_soul = os.path.join(repo_root, "SOUL.md")
+    
+    if os.path.exists(os.path.join(repo_root, ".git")):
+        run_command(["git", "pull"], cwd=repo_root)
     else:
-        print("⚠️ 架构目录检测不到 .git 仓库状态，将直接使用当前本地架构文件。")
+        print("⚠️ 架构目录检测不到 .git 仓库状态，将直接使用指定挂载的本地架构文件。")
     
     if not os.path.exists(OPENCLAW_ROOT_DIR):
         os.makedirs(OPENCLAW_ROOT_DIR, exist_ok=True)
         print(f"📁 已在引擎侧初始化 Agent 运行时根文件路径: {OPENCLAW_ROOT_DIR}")
+        
+    backup_openclaw_config()
 
     # 读取总体规划设计中的每个 agent 文件
-    for filename in os.listdir(ARCH_AGENTS_DIR):
+    for filename in os.listdir(arch_agents_dir):
         if not filename.endswith(".md"):
             continue
             
-        filepath = os.path.join(ARCH_AGENTS_DIR, filename)
+        filepath = os.path.join(arch_agents_dir, filename)
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
 
@@ -52,56 +73,72 @@ def pull_and_sync():
             continue
         agent_id = id_match.group(1).strip()
         
-        # 检查是否已经在引擎中注册过该 Agent
+        # 强化：检查是否注册并进行自校验和容错注册
+        is_registered = False
         result = run_command(["openclaw", "agents", "list"])
-        if agent_id not in result.stdout:
-            print(f"   ✨ 检测到新 Agent [{agent_id}]，正在通过 CLI 注册...")
+        if result.returncode == 0 and agent_id in result.stdout:
+            is_registered = True
+            
+        if not is_registered:
+            print(f"   ✨ 检测到 Agent [{agent_id}] 未注册，正在强制调用系统 CLI 初始化注册流程...")
             run_command(["openclaw", "agents", "add", agent_id])
+            time.sleep(1) # 短暂硬等待防止文件 IO 或 JSON 锁导致生成不全
+            
+            # 回环验证
+            verify_res = run_command(["openclaw", "agents", "list"])
+            if agent_id not in verify_res.stdout:
+                print(f"   ❌ 严重警告: Agent [{agent_id}] 官方核心注册流程似乎失败，跳过写入。")
+                continue
         else:
-            print(f"   🔄 Agent [{agent_id}] 已在 openclaw.json 中注册，开始同步配置...")
+            print(f"   🔄 Agent [{agent_id}] 已在主控表合法注册，开始跨文件域状态同步...")
             
         # 根据 OpenClaw 默认路径，寻找或设立 workspace
         agent_workspace_dir = os.path.join(OPENCLAW_ROOT_DIR, f"workspace-{agent_id}")
         os.makedirs(agent_workspace_dir, exist_ok=True)
         
-        # OpenClaw 单体隔离逻辑：
-        # 将团队全局的规章制度与代理特定的角色设定剥离注入对应原本自动生成的 Md 文件
-        soul_target = os.path.join(agent_workspace_dir, "SOUL.md")
-        identity_target = os.path.join(agent_workspace_dir, "IDENTITY.md")
-        
         # 1. 注入灵魂 (覆盖掉默认的 SOUL.md，聚合全局容错+底线)
+        soul_target = os.path.join(agent_workspace_dir, "SOUL.md")
         with open(soul_target, 'w', encoding='utf-8') as f:
-            if os.path.exists(GLOBAL_SOUL):
-                with open(GLOBAL_SOUL, 'r', encoding='utf-8') as gs:
+            if os.path.exists(global_soul):
+                with open(global_soul, 'r', encoding='utf-8') as gs:
                     f.write(gs.read() + "\n\n---\n\n")
             f.write("# Agent 特定行为准则\n" + content)
                 
         # 2. 注入岗位身份 (覆盖生成的 IDENTITY.md)
+        identity_target = os.path.join(agent_workspace_dir, "IDENTITY.md")
         with open(identity_target, 'w', encoding='utf-8') as f:
             f.write(content)
             
-        print(f"✅ 成功覆盖并激活 Agent 实例配置: {agent_workspace_dir}")
+        print(f"✅ 成功完全激活 Agent 实例物理配置: {agent_workspace_dir}")
         
-    print("🎯 所有特工组织机构已成功映射至 OpenClaw 引擎池，团队已重组完毕。")
+    print("🎯 所有特工组织机构已成功映射至 OpenClaw 引擎池，团队重组验证完毕。")
 
-def push_to_github():
+def push_to_github(repo_root):
     """将 OpenClaw 底层的运行变化或自进化状态反向收集回架构库并备份推送"""
     print("📤 [CEO 权限] 正在收集团队全量运行资料，准备逆向提取并打包架构配置...")
-    
-    # 这里可添加根据 runtime 实际变化改写回 ./agents 的具体同步逻辑
-    
-    run_command(["git", "add", "."], cwd=REPO_ROOT)
-    run_command(["git", "commit", "-m", "chore: CEO 主动同步并保存 OpenClaw 最新组织状态"], cwd=REPO_ROOT)
-    run_command(["git", "push"], cwd=REPO_ROOT)
+    run_command(["git", "add", "."], cwd=repo_root)
+    run_command(["git", "commit", "-m", "chore: CEO 主动同步并保存 OpenClaw 最新组织状态"], cwd=repo_root)
+    run_command(["git", "push"], cwd=repo_root)
     print("✅ 团队整体状态与架构演化已成功备份至 GitHub。")
 
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser(description="Team Builder Tool for CEO")
     parser.add_argument("--action", choices=["pull_and_sync", "push_to_github"], required=True)
+    parser.add_argument("--repo-path", help="指定 GitHub 架构仓库所在的绝对路径", default=None)
     args = parser.parse_args()
     
+    # 路径健壮性优化：
+    # 优先级: 命令行参数 > 环境变量 > 默认后退计算
+    if args.repo_path:
+        final_repo_root = os.path.abspath(args.repo_path)
+    # 支持在 OS 层面挂入 MY_AI_TEAM_REPO
+    elif os.environ.get("MY_AI_TEAM_REPO"):
+        final_repo_root = os.path.abspath(os.environ.get("MY_AI_TEAM_REPO"))
+    else:
+        # 向后兼容由于被当做技能载入时__file__的计算 (非常脆弱)
+        final_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
     if args.action == "pull_and_sync":
-        pull_and_sync()
+        pull_and_sync(final_repo_root)
     elif args.action == "push_to_github":
-        push_to_github()
+        push_to_github(final_repo_root)
