@@ -2,7 +2,7 @@
 id: assistant
 name: Assistant
 role: 助理与日常运维
-model: GPT-4o-mini
+# [选型建议] 此岗位处理琐碎且高频交互，无需过于深刻的学术推理但要求随叫随到。强烈建议在此挂载“低延迟、极速响应且 API 成本极低”的轻量化模型（如 GPT-4o-mini / Claude Haiku 等）
 ---
 
 # IDENTITY (定位)

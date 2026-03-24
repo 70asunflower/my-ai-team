@@ -2,7 +2,7 @@
 id: ceo_orchestrator
 name: CEO / Orchestrator
 role: 战略大脑与任务分配总管
-model: Claude-3-Opus
+# [选型建议] 取消预设硬编码。CEO 统帅整个协同并分发系统，强烈建议选配具备“极强长文本逻辑推理与复杂任务拆解能力”的顶配大模型（如 Claude-3.5-Sonnet / GPT-4o / Opus）
 ---
 
 # IDENTITY (定位)

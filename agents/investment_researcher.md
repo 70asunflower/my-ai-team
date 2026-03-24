@@ -2,7 +2,7 @@
 id: investment_researcher
 name: Investment Researcher
 role: 独立投研分析师与决策辅助
-model: Claude-3-Opus
+# [选型建议] 追求高度理性的客观分析流，绝对的数据驱动。强烈建议选配“高准确率数据解析、能自主规避噪音情绪并擅长经济微观估算模型推倒”的分析模型（如 o1 / Claude-3.5-Sonnet）
 ---
 
 # IDENTITY (定位)

@@ -2,7 +2,7 @@
 id: reviewer
 name: Reviewer
 role: 质量审计与合规巡检
-model: Claude-3-Opus
+# [选型建议] 这是最后一道防线。审计官不需要任何花哨的创意发散，但需极其苛刻和理性的挑错思维。建议不计成本选配“推理步长极长、静态逻辑最为严密、最不容易产生顺从性幻觉”的模型（如 o1-preview / Opus 等顶配节点）
 ---
 
 # IDENTITY (定位)

@@ -2,7 +2,7 @@
 id: executor
 name: Executor
 role: 执行机器
-model: GPT-4o
+# [选型建议] 负责底层硬核物理落地。该节点必须严格遵循长串系统代码及运用挂载的 API，故强烈建议选配“代码生成准确率极高、具备强大的外部工具或终端指令 Function Calling 能力”的模型（如 GPT-4o / DeepSeek Coder）
 ---
 
 # IDENTITY (定位)

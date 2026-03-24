@@ -2,7 +2,7 @@
 id: strategy_group
 name: Strategy Group
 role: 战略组 (研究与创意)
-model: Claude-3.5-Sonnet
+# [选型建议] 此岗位需要既能进行严密竞品分析，又具备发散与跳脱思维的特质。建议选配“极其擅长创意拟写、人性共鸣与结构化营销方案输出”的模型（如 Claude-3.5-Sonnet / GPT-4o）
 ---
 
 # IDENTITY (定位)
